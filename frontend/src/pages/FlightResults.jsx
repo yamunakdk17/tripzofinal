@@ -1,11 +1,10 @@
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowLeftRight,
   Backpack,
   Briefcase,
   CalendarDays,
-  Check,
   ChevronDown,
   ChevronUp,
   Luggage,
@@ -23,7 +22,7 @@ import {
   Sunset,
   User,
 } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import Footer from '@/components/layout/footer';
 import { airports } from '@/components/features/flights/flightData';
@@ -42,6 +41,7 @@ import {
   sortFlights,
   TIME_SLOTS,
 } from '@/components/features/flights/flightResultsData';
+import { isFlightApiConfigured, searchFlights } from '@/lib/flightBookingApi';
 
 const SLOT_ICONS = {
   'before-6': Sunrise,
@@ -49,6 +49,7 @@ const SLOT_ICONS = {
   '12-18': Sunset,
   'after-18': Moon,
 };
+const EMPTY_FLIGHTS = [];
 
 const THUMB_CLASSES =
   'pointer-events-none absolute inset-0 h-5 w-full appearance-none bg-transparent focus-visible:outline-none ' +
@@ -147,13 +148,14 @@ function TimeGroup({ title, selected, onToggle }) {
   );
 }
 
-function FlightFilters({ filters, onChange, bounds, options, origin, destination }) {
+function FlightFilters({ filters, onChange, bounds, options, origin, destination, hasReturn }) {
   const uid = useId();
   const mode = filters.timeMode;
   const [minPrice, maxPrice] = filters.price;
   const timeGroups = mode === 'takeoff'
     ? [{ leg: 'outbound', title: `Take-off from ${origin.code}` }, { leg: 'inbound', title: `Take-off from ${destination.code}` }]
     : [{ leg: 'outbound', title: `Landing in ${destination.code}` }, { leg: 'inbound', title: `Landing in ${origin.code}` }];
+  const activeTimeGroups = hasReturn ? timeGroups : timeGroups.slice(0, 1);
 
   function toggleTime(leg, slotId) {
     onChange({
@@ -193,7 +195,7 @@ function FlightFilters({ filters, onChange, bounds, options, origin, destination
             </button>
           ))}
         </div>
-        {timeGroups.map((group) => (
+        {activeTimeGroups.map((group) => (
           <TimeGroup key={group.leg} title={group.title} selected={filters.times[mode][group.leg]} onToggle={(slotId) => toggleTime(group.leg, slotId)} />
         ))}
       </FilterSection>
@@ -240,9 +242,11 @@ function Pill({ icon: Icon, label, value, ariaLabel, separator, className }) {
 }
 
 function FlightResultsSearchBar({ search }) {
+  const navigate = useNavigate();
+
   return (
     <section aria-label="Flight search" className="bg-zinc-900 pt-16 md:pt-20">
-      <form onSubmit={(event) => event.preventDefault()} className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-4 py-4 sm:px-6">
+      <form onSubmit={(event) => { event.preventDefault(); navigate('/flights'); }} className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-4 py-4 sm:px-6">
         <Pill ariaLabel="Trip type" value={search.tripType} className="w-full sm:w-auto" />
         <Pill icon={PlaneTakeoff} label="From" ariaLabel="Departure city" value={search.from.label} className="min-w-0 flex-1 basis-40" />
         <button type="button" aria-label="Swap origin and destination" className="grid size-11 shrink-0 place-items-center rounded-xl bg-blue-600 text-white transition-colors hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
@@ -308,7 +312,7 @@ function Leg({ leg }) {
   );
 }
 
-function FlightResultCard({ flight, destinationCity, selected, onSelect }) {
+function FlightResultCard({ flight, destinationCity, onSelect }) {
   const [expanded, setExpanded] = useState(false);
   const { outbound, inbound, bags } = flight;
   return (
@@ -316,12 +320,16 @@ function FlightResultCard({ flight, destinationCity, selected, onSelect }) {
       <article className="relative flex flex-col rounded-3xl bg-white shadow-sm md:flex-row">
         <div className="flex-1 p-5 sm:p-6">
           <Leg leg={outbound} />
-          <div className="my-4 flex items-center">
-            <span className="flex-1 border-t border-dashed border-zinc-300" />
-            <span className="mx-3 rounded-full bg-zinc-100 px-3 py-1 text-[11px] text-zinc-600">{flight.nights} nights in {destinationCity}</span>
-            <span className="flex-1 border-t border-dashed border-zinc-300" />
-          </div>
-          <Leg leg={inbound} />
+          {inbound && (
+            <>
+              <div className="my-4 flex items-center">
+                <span className="flex-1 border-t border-dashed border-zinc-300" />
+                <span className="mx-3 rounded-full bg-zinc-100 px-3 py-1 text-[11px] text-zinc-600">{flight.nights} nights in {destinationCity}</span>
+                <span className="flex-1 border-t border-dashed border-zinc-300" />
+              </div>
+              <Leg leg={inbound} />
+            </>
+          )}
         </div>
         <aside className="relative flex flex-col justify-between border-t border-dashed border-zinc-300 p-5 md:w-64 md:border-l md:border-t-0">
           <span aria-hidden className="absolute -left-2 -top-2 hidden size-4 rounded-full bg-zinc-50 md:block" />
@@ -341,8 +349,8 @@ function FlightResultCard({ flight, destinationCity, selected, onSelect }) {
             <p className="mt-2 border-t border-zinc-100 pt-2 text-[11px] text-zinc-500">{FARE_LABEL}</p>
           </div>
           <p className="my-4 text-center text-2xl font-semibold text-zinc-900">{flight.price} USD</p>
-          <button type="button" aria-pressed={selected} onClick={() => onSelect(flight.id)} className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700">
-            {selected ? <><Check className="size-4" aria-hidden />Selected</> : 'Select'}
+          <button type="button" onClick={() => onSelect(flight)} className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700">
+            Select flight
           </button>
         </aside>
       </article>
@@ -378,18 +386,61 @@ function FlightRouteMap({ flights, origin, destination }) {
 
 export default function FlightResults() {
   const location = useLocation();
-  const search = useMemo(() => getFlightSearch(location.state?.search, airports), [location.state]);
-  const flights = useMemo(
-    () => getFlightResults(search.from, search.to, search.departureDate, search.returnDate),
-    [search],
+  const navigate = useNavigate();
+  const query = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const rawSearch = useMemo(
+    () => location.state?.search ?? {
+      tripType: query.get('tripType'),
+      from: query.get('from'),
+      to: query.get('to'),
+      departureDate: query.get('departureDate'),
+      returnDate: query.get('returnDate'),
+      travellers: Number(query.get('travellers')) || 1,
+      cabin: query.get('cabin'),
+    },
+    [location.state, query],
   );
-  const bounds = useMemo(() => getFilterBounds(flights), [flights]);
+  const search = useMemo(() => getFlightSearch(rawSearch, airports), [rawSearch]);
+  const searchKey = useMemo(() => JSON.stringify(search), [search]);
+  const [flightLoad, setFlightLoad] = useState(null);
+  const isCurrentSearch = flightLoad?.key === searchKey;
+  const flights = isCurrentSearch ? flightLoad.flights : EMPTY_FLIGHTS;
+  const loading = !isCurrentSearch;
+  const searchError = isCurrentSearch ? flightLoad.error : '';
+  const bounds = useMemo(
+    () => getFilterBounds(flights),
+    [flights],
+  );
   const options = useMemo(() => getFilterOptions(flights), [flights]);
   const [filters, setFilters] = useState(() => createDefaultFilters(bounds));
   const [sortMode, setSortMode] = useState('best');
   const [showMap, setShowMap] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedId, setSelectedId] = useState(null);
+  useEffect(() => {
+    let active = true;
+
+    const loadFlights = async () => {
+      try {
+        const results = isFlightApiConfigured
+          ? await searchFlights(search)
+          : getFlightResults(search.from, search.to, search.departureDate, search.returnDate, search.tripType);
+        if (!active) return;
+        setFlightLoad({ key: searchKey, flights: results, error: '' });
+        setFilters(createDefaultFilters(getFilterBounds(results)));
+      } catch (error) {
+        if (!active) return;
+        setFlightLoad({
+          key: searchKey,
+          flights: [],
+          error: error.message || 'Unable to load flights. Please try again.',
+        });
+      }
+    };
+
+    loadFlights();
+    return () => { active = false; };
+  }, [search, searchKey]);
+
   const filtered = useMemo(() => applyFilters(flights, filters), [flights, filters]);
   const sorted = useMemo(() => sortFlights(filtered, sortMode), [filtered, sortMode]);
   const summaries = useMemo(
@@ -409,18 +460,27 @@ export default function FlightResults() {
     setFilters(createDefaultFilters(bounds));
   }
 
+  function selectFlight(flight) {
+    navigate('/flights/booking', { state: { search, flight } });
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50 text-zinc-900">
       <FlightResultsSearchBar search={search} />
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:py-10">
+        {!isFlightApiConfigured && (
+          <p role="status" className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Sample flights are shown for preview. Live search, booking, and payment require a connected Tripzo API.
+          </p>
+        )}
         <div className="grid gap-6 lg:grid-cols-[17rem_minmax(0,1fr)] xl:gap-14">
           <aside aria-label="Flight filters" className={showFilters ? 'block' : 'hidden lg:block'}>
-            <FlightFilters filters={filters} onChange={updateFilters} bounds={bounds} options={options} origin={search.from} destination={search.to} />
+            <FlightFilters filters={filters} onChange={updateFilters} bounds={bounds} options={options} origin={search.from} destination={search.to} hasReturn={search.tripType !== 'One-way'} />
           </aside>
           <section aria-label="Flight results" className="mx-auto w-full max-w-2xl lg:mx-0">
             <FlightSortTabs value={sortMode} onChange={setSortMode} summaries={summaries} />
             <div className="mb-3 mt-6 flex items-center justify-between">
-              <p className="text-sm font-medium text-zinc-800" aria-live="polite">{sorted.length} results</p>
+              <p className="text-sm font-medium text-zinc-800" aria-live="polite">{loading ? 'Searching flights…' : `${sorted.length} results`}</p>
               <div className="flex items-center gap-2">
                 <button type="button" aria-expanded={showFilters} onClick={() => setShowFilters((open) => !open)} className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 lg:hidden">
                   <SlidersHorizontal className="size-3.5" aria-hidden />Filters
@@ -437,12 +497,29 @@ export default function FlightResults() {
                 </motion.div>
               )}
             </AnimatePresence>
-            {sorted.length > 0 ? (
+            {loading ? (
+              <div role="status" className="rounded-3xl bg-white p-8 text-center shadow-sm">
+                <p className="text-sm font-semibold">Searching available flights…</p>
+                <p className="mt-1 text-xs text-zinc-500">This may take a few seconds.</p>
+              </div>
+            ) : searchError ? (
+              <div role="alert" className="rounded-3xl bg-white p-8 text-center shadow-sm">
+                <p className="text-sm font-semibold">We couldn’t load flights</p>
+                <p className="mt-1 text-sm text-red-700">{searchError}</p>
+                <button type="button" onClick={() => navigate(0)} className="mt-4 h-10 rounded-xl bg-blue-600 px-5 text-sm text-white hover:bg-blue-700">Try again</button>
+              </div>
+            ) : sorted.length > 0 ? (
               <ul className="space-y-5">
                 {sorted.map((flight) => (
-                  <FlightResultCard key={flight.id} flight={flight} destinationCity={search.to.city} selected={selectedId === flight.id} onSelect={setSelectedId} />
+                  <FlightResultCard key={flight.id} flight={flight} destinationCity={search.to.city} onSelect={selectFlight} />
                 ))}
               </ul>
+            ) : flights.length === 0 ? (
+              <div className="rounded-3xl bg-white p-8 text-center shadow-sm">
+                <p className="text-sm font-semibold">No flights found for this search</p>
+                <p className="mt-1 text-xs text-zinc-500">Try different cities or travel dates.</p>
+                <button type="button" onClick={() => navigate('/flights')} className="mt-4 h-10 rounded-xl bg-blue-600 px-5 text-sm text-white hover:bg-blue-700">Change search</button>
+              </div>
             ) : (
               <div className="rounded-3xl bg-white p-8 text-center shadow-sm">
                 <p className="text-sm font-semibold">No flights match your filters</p>

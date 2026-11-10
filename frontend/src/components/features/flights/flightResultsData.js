@@ -88,25 +88,28 @@ export function getFlightSearch(values, airports) {
     airports.find((airport) => airport.code === values?.to) ??
     airports.find((airport) => airport.code !== from.code) ??
     airports[0];
-  const departureDate = values?.departureDate;
-  const returnDate = values?.returnDate;
   const tripType = values?.tripType ?? 'roundTrip';
+  const departureDate = values?.departureDate;
+  const returnDate = tripType === 'oneWay' ? '' : values?.returnDate;
   const travelerCount = values?.travellers ?? 1;
 
   return {
     tripType: tripType === 'oneWay' ? 'One-way' : tripType === 'multiCity' ? 'Multi-city' : 'Round-trip',
+    tripTypeCode: values?.tripType ?? 'roundTrip',
     from: { city: from.city, code: from.code, label: `${from.city} (${from.code})` },
     to: { city: to.city, code: to.code, label: `${to.city} (${to.code})` },
     dates: departureDate
       ? `${formatLegDate(departureDate, new Date())}${returnDate ? ` – ${formatLegDate(returnDate, new Date())}` : ''}`
       : 'Flexible dates',
     travelers: `${travelerCount} ${travelerCount === 1 ? 'Adult' : 'Adults'}${values?.cabin ? ` · ${values.cabin}` : ''}`,
+    travellerCount: travelerCount,
+    cabin: values?.cabin ?? 'Economy',
     departureDate: departureDate ?? '',
     returnDate: returnDate ?? '',
   };
 }
 
-export function getFlightResults(origin, destination, departureDate, returnDate) {
+export function getFlightResults(origin, destination, departureDate, returnDate, tripType) {
   const outboundDate = formatLegDate(departureDate, new Date('2027-02-02T12:00:00'));
   const inboundDate = formatLegDate(returnDate, new Date('2027-02-09T12:00:00'));
 
@@ -119,7 +122,7 @@ export function getFlightResults(origin, destination, departureDate, returnDate)
       to: destination.code,
       dateLabel: `${outboundDate}, Outbound`,
     },
-    inbound: {
+    inbound: tripType === 'One-way' ? null : {
       ...flight.inbound,
       from: destination.code,
       to: origin.code,
@@ -150,10 +153,12 @@ function getStopCategory(stops) {
 }
 
 export function getTotalDuration(flight) {
-  return flight.outbound.durationMinutes + flight.inbound.durationMinutes;
+  return flight.outbound.durationMinutes + (flight.inbound?.durationMinutes ?? 0);
 }
 
 export function getFilterBounds(flights) {
+  if (!flights.length) return { maxPrice: 0, maxDuration: 0 };
+
   const maxPrice = Math.max(...flights.map((flight) => flight.price));
   const maxDuration = Math.max(...flights.map(getTotalDuration));
 
@@ -189,7 +194,10 @@ export function applyFilters(flights, filters) {
     const { outbound, inbound } = flight;
 
     if (flight.bags.cabin < filters.cabinBags || flight.bags.checked < filters.checkedBags) return false;
-    if (!filters.stops[getStopCategory(outbound.stops)] || !filters.stops[getStopCategory(inbound.stops)]) return false;
+    if (
+      !filters.stops[getStopCategory(outbound.stops)] ||
+      (inbound && !filters.stops[getStopCategory(inbound.stops)])
+    ) return false;
     if (flight.price < filters.price[0] || flight.price > filters.price[1]) return false;
     if (getTotalDuration(flight) > filters.maxDuration) return false;
     if (filters.airlines.length && !filters.airlines.includes(flight.airline)) return false;
@@ -201,7 +209,7 @@ export function applyFilters(flights, filters) {
     ];
 
     for (const { mode, hourKey } of modes) {
-      for (const leg of ['outbound', 'inbound']) {
+      for (const leg of inbound ? ['outbound', 'inbound'] : ['outbound']) {
         const selected = filters.times[mode][leg];
         if (!selected.length) continue;
         const hour = flight[leg][hourKey];
