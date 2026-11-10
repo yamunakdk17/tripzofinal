@@ -4,6 +4,7 @@ import Home from '@/pages/Home';
 import Flights from '@/pages/Flights';
 import FlightResults from '@/pages/FlightResults';
 import FlightBooking from '@/pages/FlightBooking';
+import StaysPage from '@/pages/StaysPage';
 
 export default function App() {
   return (
@@ -11,6 +12,8 @@ export default function App() {
       <Navbar />
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/hotels/*" element={<StaysPage />} />
+        <Route path="/stays/*" element={<StaysPage />} />
         <Route path="/flights" element={<Flights />} />
         <Route path="/flights/results" element={<FlightResults />} />
         <Route path="/flights/booking" element={<FlightBooking />} />
