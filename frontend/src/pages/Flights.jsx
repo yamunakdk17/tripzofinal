@@ -1,11 +1,12 @@
 import FlightHero from '@/components/features/flights/FlightHero';
-// import FlightSearch from '@/components/features/flights/FlightSearch';
+import { useNavigate } from 'react-router-dom';
 
 export default function Flights() {
+  const navigate = useNavigate();
+
   return (
     <main>
-      <FlightHero />
-      {/* <FlightSearch /> */}
+      <FlightHero onSearch={(search) => navigate('/flights/results', { state: { search } })} />
     </main>
   );
 }
