@@ -1,0 +1,14 @@
+import { Link, useParams } from 'react-router-dom';
+
+import StayBookingStepper from '@/components/features/stays/StayBookingStepper';
+import StayPageFrame from '@/components/features/stays/StayPageFrame';
+import { formatMoney, formatStayDate } from '@/components/features/stays/stayData';
+import { useStayBooking } from '@/hooks/useStays';
+
+export default function StayBookingPage() {
+  const { bookingRef } = useParams();
+  const { data: booking, loading, error } = useStayBooking(bookingRef);
+  if (loading) return <StayPageFrame><p role="status">Loading booking…</p></StayPageFrame>;
+  if (error || !booking) return <StayPageFrame><div role="alert" className="rounded-2xl bg-white p-6">Booking not found. <Link className="underline" to="/stays">Search stays</Link></div></StayPageFrame>;
+  return <StayPageFrame className="mx-auto max-w-3xl"><StayBookingStepper current={3}/><h1 className="mb-2 text-3xl font-semibold text-[#08446E]">Review your booking</h1><section className="space-y-5 rounded-2xl bg-white p-6 shadow-md"><header><h2 className="text-xl font-semibold">{booking.stayName}</h2><p className="text-sm text-zinc-600">{booking.stayArea}</p><p className="mt-2 inline-block rounded-full bg-amber-100 px-3 py-1 text-sm">Booking {booking.status}</p></header><dl className="grid gap-4 sm:grid-cols-2"><div><dt className="text-xs uppercase text-zinc-500">Check-in</dt><dd>{formatStayDate(booking.search.checkIn)}</dd></div><div><dt className="text-xs uppercase text-zinc-500">Check-out</dt><dd>{formatStayDate(booking.search.checkOut)}</dd></div><div><dt className="text-xs uppercase text-zinc-500">Room</dt><dd>{booking.reservation.room.name} · {booking.reservation.rooms}</dd></div><div><dt className="text-xs uppercase text-zinc-500">Primary guest</dt><dd>{booking.guest.firstName} {booking.guest.lastName}</dd></div><div><dt className="text-xs uppercase text-zinc-500">Email</dt><dd className="break-all">{booking.guest.email}</dd></div><div><dt className="text-xs uppercase text-zinc-500">Phone</dt><dd>{booking.guest.phone}</dd></div></dl><div className="flex justify-between border-t pt-4 text-lg font-bold"><span>Total · {booking.reservation.nights} night(s)</span><span>{formatMoney(booking.amount, booking.currency)}</span></div><p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">Demo booking: this sample reservation is stored in this browser and is not sent to a hotel inventory system.</p>{booking.status === 'confirmed' ? <Link to={`/stays/booking/confirmed/${booking.reference}`} state={{ booking }} className="inline-block rounded-xl bg-[#124E7B] px-6 py-3 font-semibold text-white">View confirmation</Link> : <Link to={`/stays/payment/${booking.reference}`} state={{ booking }} className="inline-block rounded-xl bg-[#124E7B] px-6 py-3 font-semibold text-white">Continue to payment</Link>}</section></StayPageFrame>;
+}
