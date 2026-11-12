@@ -93,6 +93,7 @@ export default function Footer() {
 
             <Button
               render={<Link to="/hotels" />}
+              nativeButton={false}
               size="lg"
               className="mt-7 rounded-full bg-primary px-6 text-white hover:bg-primary-dark">
               Explore stays

@@ -5,6 +5,12 @@ import Flights from '@/pages/Flights';
 import FlightResults from '@/pages/FlightResults';
 import FlightBooking from '@/pages/FlightBooking';
 import StaysPage from '@/pages/StaysPage';
+import TaxiPage from '@/pages/taxis/TaxiPage';
+import TaxiResultsPage from '@/pages/taxis/TaxiResultsPage';
+import TaxiDetailsPage from '@/pages/taxis/TaxiDetailsPage';
+import TaxiBookingPage from '@/pages/taxis/TaxiBookingPage';
+import TaxiPaymentPage from '@/pages/taxis/TaxiPaymentPage';
+import TaxiConfirmationPage from '@/pages/taxis/TaxiConfirmationPage';
 
 export default function App() {
   return (
@@ -19,6 +25,12 @@ export default function App() {
         <Route path="/flights/booking" element={<FlightBooking />} />
         <Route path="/flights/payment" element={<FlightBooking />} />
         <Route path="/flights/confirmation" element={<FlightBooking />} />
+        <Route path="/airport-taxi" element={<TaxiPage />} />
+        <Route path="/airport-taxi/results" element={<TaxiResultsPage />} />
+        <Route path="/airport-taxi/vehicles/:taxiId" element={<TaxiDetailsPage />} />
+        <Route path="/airport-taxi/booking/:bookingId" element={<TaxiBookingPage />} />
+        <Route path="/airport-taxi/booking/:bookingId/payment" element={<TaxiPaymentPage />} />
+        <Route path="/airport-taxi/booking/:bookingId/confirmation" element={<TaxiConfirmationPage />} />
       </Routes>
     </>
   );
