@@ -4,6 +4,30 @@ function wait(milliseconds = 180) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+const BOOKINGS_KEY = 'tripzo.stayBookings';
+
+function readBookings() {
+  try {
+    return JSON.parse(window.localStorage.getItem(BOOKINGS_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function saveBooking(booking) {
+  const bookings = readBookings();
+  bookings[booking.reference] = booking;
+  window.localStorage.setItem(BOOKINGS_KEY, JSON.stringify(bookings));
+  return booking;
+}
+
+export async function getStayBooking(reference) {
+  await wait();
+  const booking = readBookings()[reference];
+  if (!booking) throw new Error('Booking not found');
+  return booking;
+}
+
 export async function getStayOffers() {
   await wait();
   return stayOffers;
@@ -54,13 +78,13 @@ export async function getStayById(id) {
 export async function createStayBooking(payload) {
   await wait(400);
   const reference = `TZ-${Date.now().toString(36).toUpperCase()}`;
-  return {
+  return saveBooking({
     id: reference,
     reference,
     status: 'pending',
     createdAt: new Date().toISOString(),
     ...payload,
-  };
+  });
 }
 
 export async function simulateStayPayment(booking, outcome, provider) {
@@ -69,19 +93,19 @@ export async function simulateStayPayment(booking, outcome, provider) {
   if (!['success', 'failure'].includes(outcome)) throw new Error('Choose a valid demo payment result.');
 
   if (outcome === 'failure') {
-    return {
+    return saveBooking({
       ...booking,
       status: 'payment_failed',
       paymentProvider: provider,
       paymentMessage: 'Demo payment failed. No payment was taken.',
-    };
+    });
   }
 
-  return {
+  return saveBooking({
     ...booking,
     status: 'confirmed',
     paymentProvider: provider,
     paidAt: new Date().toISOString(),
     paymentMessage: 'Demo payment completed successfully.',
-  };
+  });
 }

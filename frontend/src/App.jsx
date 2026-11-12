@@ -4,7 +4,11 @@ import Home from '@/pages/Home';
 import Flights from '@/pages/Flights';
 import FlightResults from '@/pages/FlightResults';
 import FlightBooking from '@/pages/FlightBooking';
-import StaysPage from '@/pages/StaysPage';
+import StaysPage from '@/pages/stays/StaysPage';
+import StayResultsPage from '@/pages/stays/StayResultsPage';
+import StayDetailsPage from '@/pages/stays/StayDetailsPage';
+import StayReservationPage from '@/pages/stays/StayReservationPage';
+import StayConfirmationPage from '@/pages/stays/StayConfirmationPage';
 import TaxiPage from '@/pages/taxis/TaxiPage';
 import TaxiResultsPage from '@/pages/taxis/TaxiResultsPage';
 import TaxiDetailsPage from '@/pages/taxis/TaxiDetailsPage';
@@ -19,7 +23,14 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/hotels/*" element={<StaysPage />} />
-        <Route path="/stays/*" element={<StaysPage />} />
+        <Route path="/stays" element={<StaysPage />} />
+        <Route path="/stays/search" element={<StayResultsPage />} />
+        <Route path="/stays/booking/confirmed/:bookingRef?" element={<StayConfirmationPage />} />
+        <Route path="/stays/:stayId/reserve" element={<StayReservationPage />} />
+        <Route path="/stays/:stayId/guest" element={<StayReservationPage />} />
+        <Route path="/stays/:stayId" element={<StayDetailsPage />} />
+        <Route path="/stays/booking/:bookingRef" element={<StaysPage />} />
+        <Route path="/stays/payment/:bookingRef" element={<StaysPage />} />
         <Route path="/flights" element={<Flights />} />
         <Route path="/flights/results" element={<FlightResults />} />
         <Route path="/flights/booking" element={<FlightBooking />} />

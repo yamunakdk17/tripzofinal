@@ -35,7 +35,7 @@ import {
   staySearchDefaults,
   toStayQuery,
 } from '@/components/features/stays/stayData';
-import { createStayBooking, getStayById, searchStays, simulateStayPayment } from '@/services/stayService';
+import { createStayBooking, getStayBooking, getStayById, searchStays, simulateStayPayment } from '@/services/stayService';
 
 const shellClass = 'min-h-screen bg-gradient-to-b from-sky-200 via-sky-100 to-white';
 const inputClass = 'mt-1.5 h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-[#2A84C8] focus:ring-2 focus:ring-sky-100';
@@ -618,6 +618,14 @@ function Confirmation({ booking }) {
         </p>
         {confirmed && (
           <>
+            <dl className="mt-6 grid gap-4 rounded-xl bg-sky-50 p-4 text-left sm:grid-cols-2">
+              <div><dt className="text-xs uppercase text-zinc-500">Location</dt><dd className="mt-1 font-medium">{booking.stayArea}</dd></div>
+              <div><dt className="text-xs uppercase text-zinc-500">Room</dt><dd className="mt-1 font-medium">{booking.reservation.room.name} · {booking.reservation.rooms} room(s)</dd></div>
+              <div><dt className="text-xs uppercase text-zinc-500">Guest</dt><dd className="mt-1 font-medium">{booking.guest.firstName} {booking.guest.lastName}</dd></div>
+              <div><dt className="text-xs uppercase text-zinc-500">Phone</dt><dd className="mt-1 font-medium">{booking.guest.phone}</dd></div>
+              <div><dt className="text-xs uppercase text-zinc-500">Booking status</dt><dd className="mt-1 font-medium">{booking.status}</dd></div>
+              <div><dt className="text-xs uppercase text-zinc-500">Payment method</dt><dd className="mt-1 font-medium">{booking.paymentProvider}</dd></div>
+            </dl>
             <p className="mt-4 text-lg font-bold">{formatMoney(booking.amount, booking.currency)} paid with {booking.paymentProvider}</p>
             <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-sm text-amber-950">
               This is a demo booking and simulated payment, not a real hotel reservation or charge.
@@ -635,6 +643,10 @@ function StayRoute() {
   const location = useLocation();
   const { pathname, search } = location;
   const state = location.state;
+  const bookingReference =
+    pathname.match(/^\/(?:stays|hotels)\/booking\/confirmed\/([^/]+)$/)?.[1] ||
+    pathname.match(/^\/(?:stays|hotels)\/(?:booking|payment)\/([^/]+)/)?.[1];
+  const [storedBooking, setStoredBooking] = useState(null);
   const params = useMemo(() => new URLSearchParams(search), [search]);
   const [stayRequest, setStayRequest] = useState(null);
   const routeMatch = pathname.match(/^\/(?:stays|hotels)\/([^/]+)/);
@@ -654,12 +666,22 @@ function StayRoute() {
     return () => { active = false; };
   }, [stayId, shouldLoadStay]);
 
+  useEffect(() => {
+    if (!bookingReference || state?.booking) return undefined;
+    let active = true;
+    getStayBooking(bookingReference)
+      .then((booking) => { if (active) setStoredBooking(booking); })
+      .catch(() => { if (active) setStoredBooking(null); });
+    return () => { active = false; };
+  }, [bookingReference, state?.booking]);
+
   if (pathname === '/stays' || pathname === '/hotels' || pathname === '/stays/' || pathname === '/hotels/') return <StayHome />;
   if (pathname === '/stays/search' || pathname === '/hotels/search') return <StayResults search={searchValues} />;
 
-  if (/\/booking\/confirmed(?:\/[^/]+)?$/.test(pathname)) return <Confirmation booking={state?.booking} />;
-  if (/\/payment\/[^/]+$/.test(pathname)) return <StayPayment booking={state?.booking} />;
-  if (/\/booking\/[^/]+$/.test(pathname)) return <BookingReview booking={state?.booking} />;
+  const booking = state?.booking || storedBooking;
+  if (/\/booking\/confirmed(?:\/[^/]+)?$/.test(pathname)) return <Confirmation booking={booking} />;
+  if (/\/payment\/[^/]+$/.test(pathname)) return <StayPayment booking={booking} />;
+  if (/\/booking\/[^/]+$/.test(pathname)) return <BookingReview booking={booking} />;
 
   if (stayLoading) return <PageFrame><div role="status" className={`${cardClass} text-center`}><LoaderCircle className="mx-auto size-6 animate-spin text-blue-700" />Loading stay details…</div></PageFrame>;
   if (stayError || !currentStay) {
